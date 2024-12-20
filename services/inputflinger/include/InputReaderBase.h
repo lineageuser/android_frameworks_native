@@ -34,7 +34,9 @@
 #include <vector>
 
 #include "PointerControllerInterface.h"
+#include "TouchpadHardwareState.h"
 #include "VibrationElement.h"
+#include "include/gestures.h"
 
 // Maximum supported size of a vibration pattern.
 // Must be at least 2.
@@ -91,8 +93,11 @@ struct InputReaderConfiguration {
         // The touchpad settings changed.
         TOUCHPAD_SETTINGS = 1u << 13,
 
+        // The key remapping has changed.
+        KEY_REMAPPING = 1u << 14,
+
         // Volume keys rotation option changed.
-        VOLUME_KEYS_ROTATION = 1 << 10,
+        VOLUME_KEYS_ROTATION = 1u << 15,
 
         // All devices must be reopened.
         MUST_REOPEN = 1u << 31,
@@ -230,6 +235,9 @@ struct InputReaderConfiguration {
     // True to enable tap dragging on touchpads.
     bool touchpadTapDraggingEnabled;
 
+    // True if hardware state update notifications should be sent to the policy.
+    bool shouldNotifyTouchpadHardwareState;
+
     // True to enable a zone on the right-hand side of touchpads where clicks will be turned into
     // context (a.k.a. "right") clicks.
     bool touchpadRightClickZoneEnabled;
@@ -243,6 +251,9 @@ struct InputReaderConfiguration {
 
     // True if a pointer icon should be shown for direct stylus pointers.
     bool stylusPointerIconEnabled;
+
+    // Keycodes to be remapped.
+    std::map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */> keyRemapping;
 
     // Remap volume keys according to display rotation
     // 0 - disabled, 1 - phone or hybrid rotation mode, 2 - tablet rotation mode
@@ -275,6 +286,7 @@ struct InputReaderConfiguration {
             touchpadNaturalScrollingEnabled(true),
             touchpadTapToClickEnabled(true),
             touchpadTapDraggingEnabled(false),
+            shouldNotifyTouchpadHardwareState(false),
             touchpadRightClickZoneEnabled(false),
             stylusButtonMotionEventsEnabled(true),
             stylusPointerIconEnabled(false),
@@ -335,9 +347,6 @@ public:
     virtual int32_t getKeyCodeState(int32_t deviceId, uint32_t sourceMask, int32_t keyCode) = 0;
     virtual int32_t getSwitchState(int32_t deviceId, uint32_t sourceMask, int32_t sw) = 0;
 
-    virtual void addKeyRemapping(int32_t deviceId, int32_t fromKeyCode,
-                                 int32_t toKeyCode) const = 0;
-
     virtual int32_t getKeyCodeForKeyLocation(int32_t deviceId, int32_t locationKeyCode) const = 0;
 
     /* Toggle Caps Lock */
@@ -370,6 +379,8 @@ public:
     virtual std::vector<InputDeviceLightInfo> getLights(int32_t deviceId) = 0;
 
     virtual std::vector<InputDeviceSensorInfo> getSensors(int32_t deviceId) = 0;
+
+    virtual std::optional<HardwareProperties> getTouchpadHardwareProperties(int32_t deviceId) = 0;
 
     /* Return true if the device can send input events to the specified display. */
     virtual bool canDispatchToDisplay(int32_t deviceId, ui::LogicalDisplayId displayId) = 0;
@@ -405,6 +416,9 @@ public:
      * Returns ReservedInputDeviceId::INVALID_INPUT_DEVICE_ID if no device has been used since boot.
      */
     virtual DeviceId getLastUsedInputDeviceId() = 0;
+
+    /* Notifies that mouse cursor faded due to typing. */
+    virtual void notifyMouseCursorFadedOnTyping() = 0;
 };
 
 // --- TouchAffineTransformation ---
@@ -458,6 +472,13 @@ public:
      * and provides information about all current input devices.
      */
     virtual void notifyInputDevicesChanged(const std::vector<InputDeviceInfo>& inputDevices) = 0;
+
+    /* Sends the hardware state of a connected touchpad */
+    virtual void notifyTouchpadHardwareState(const SelfContainedHardwareState& schs,
+                                             int32_t deviceId) = 0;
+
+    /* Sends the Info of gestures that happen on the touchpad. */
+    virtual void notifyTouchpadGestureInfo(GestureType type, int32_t deviceId) = 0;
 
     /* Gets the keyboard layout for a particular input device. */
     virtual std::shared_ptr<KeyCharacterMap> getKeyboardLayoutOverlay(
