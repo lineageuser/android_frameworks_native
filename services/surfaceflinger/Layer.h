@@ -418,6 +418,8 @@ public:
     // Check if the damage region is a small dirty.
     void setIsSmallDirty(frontend::LayerSnapshot* snapshot);
 
+    gui::WindowInfo::Type getWindowType() const { return mWindowType; }
+
 protected:
     // For unit tests
     friend class TestableSurfaceFlinger;
